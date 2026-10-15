@@ -1,0 +1,15 @@
+{
+  "id": "./",
+  "name": "Knowledge Stash",
+  "short_name": "Stash",
+  "description": "A personal, free microlearning app. Learn, save and review ideas.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f7fb",
+  "theme_color": "#f8f7fc",
+  "icons": [
+    {"src":"./icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"./icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}

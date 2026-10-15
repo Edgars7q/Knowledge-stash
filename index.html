@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f7fc">
+  <meta name="description" content="A free, personal, offline-friendly microlearning companion.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./style.css">
+  <title>Knowledge Stash — Learn a little, every day</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#today" aria-label="Knowledge Stash, go to Today">
+        <span class="brand-icon" aria-hidden="true">✦</span>
+        <span>Knowledge <strong>Stash</strong></span>
+      </a>
+      <div class="header-actions">
+        <button class="icon-button" id="open-add" aria-label="Add a learning idea" title="Add idea">＋</button>
+        <button class="icon-button" id="open-settings" aria-label="Settings and backup" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <main id="app-content" tabindex="-1" aria-live="polite"></main>
+
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <a href="#today" data-tab="today" class="nav-item active"><span class="nav-symbol" aria-hidden="true">⌂</span><span>Today</span></a>
+      <a href="#discover" data-tab="discover" class="nav-item"><span class="nav-symbol" aria-hidden="true">◈</span><span>Discover</span></a>
+      <a href="#stash" data-tab="stash" class="nav-item"><span class="nav-symbol" aria-hidden="true">▣</span><span>My Stash</span></a>
+      <a href="#review" data-tab="review" class="nav-item"><span class="nav-symbol" aria-hidden="true">↻</span><span>Review</span></a>
+    </nav>
+  </div>
+  <div id="overlay" class="overlay" hidden role="presentation">
+    <section id="dialog" class="dialog" role="dialog" aria-modal="true" aria-label="Details"></section>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./data.js"></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>
