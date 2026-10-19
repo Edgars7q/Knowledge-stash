@@ -1,0 +1,133 @@
+{
+  "format": "knowledge-stash-lesson-pack",
+  "schemaVersion": 2,
+  "lessons": [
+    {
+      "id": "example-process-bottlenecks",
+      "version": 1,
+      "title": "Why process bottlenecks limit total output",
+      "category": "Business",
+      "model": "system",
+      "level": "Beginner",
+      "minutes": 8,
+      "hook": "Making one workstation faster may not increase production if another station determines throughput.",
+      "stages": [
+        {
+          "title": "Find the slowest necessary stage",
+          "paragraphs": [
+            "Imagine three workstations in series. The first can handle 60 units per hour, the second 40, and the third 70. Because each finished unit must pass through all three, steady throughput cannot exceed 40 units per hour under these assumptions.",
+            "You may see large queues forming before the second workstation even when upstream staff work faster. The queue is a symptom of unbalanced capacity and helps identify where further investigation may be valuable."
+          ],
+          "visual": {
+            "type": "sequence",
+            "labels": [
+              "Stage A: 60/h",
+              "Stage B: 40/h",
+              "Stage C: 70/h"
+            ]
+          },
+          "takeaway": "A necessary constrained stage can limit the overall production rate."
+        },
+        {
+          "title": "Separate local efficiency from system results",
+          "paragraphs": [
+            "If the first workstation increases output to 90 units per hour while the second remains at 40, the extra output does not raise completed throughput. Instead, unfinished work may accumulate ahead of the bottleneck.",
+            "In an actual process, variability, equipment downtime, blocking, starving and batch sizes also influence output. A simple capacity comparison is a starting approximation, not a full simulation."
+          ],
+          "takeaway": "Optimising a single station can worsen inventory without improving completed output."
+        },
+        {
+          "title": "Test an improvement",
+          "paragraphs": [
+            "Now assume the second station is improved from 40 to 65 units per hour. The first stage can supply 60 and the third can process 70, so the simplified process ceiling becomes 60 units per hour. The constraint has moved.",
+            "After any improvement, measure actual completed output and review queues rather than assuming the intervention worked. Some interventions only shift delays to a different stage."
+          ],
+          "takeaway": "A constraint can move after an improvement; reassess the entire line."
+        },
+        {
+          "title": "Real-world example in retail",
+          "paragraphs": [
+            "Consider a shop checkout workflow: picking items, scanning transactions and bagging goods. A faster scanner alone may not improve customer throughput if payment approval takes longer than everything else.",
+            "Before investing in equipment, record arrival patterns, processing times and the location of waiting queues. Distinguish a temporary disturbance from a genuinely constrained stage under normal load."
+          ],
+          "takeaway": "Observe system throughput and waiting time, not only individual activity rates."
+        },
+        {
+          "title": "Apply the concept to another process",
+          "paragraphs": [
+            "Suppose a line contains stages capable of 35, 50 and 45 units per hour. Under a steady-state serial model, output cannot exceed 35 units per hour. Increasing the second stage to 80 does not change this limit.",
+            "A useful engineering or management response is to validate these rates, look for downtime and variability, then target the constraint if the cost of improvement is justified. Always separate a theoretical ceiling from measured production."
+          ],
+          "takeaway": "The bottleneck idea is useful because it redirects attention from busy-looking work to total system output."
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Three required stages have capacities 60, 40 and 70 units/h. Maximum steady throughput is:",
+          "options": [
+            "40 units/h",
+            "60 units/h",
+            "70 units/h"
+          ],
+          "answer": 0,
+          "explanation": "The slowest required stage can process only 40 units per hour."
+        },
+        {
+          "question": "Improving a non-bottleneck stage always increases completed production.",
+          "options": [
+            "True",
+            "False"
+          ],
+          "answer": 1,
+          "explanation": "The bottleneck may still constrain system output."
+        },
+        {
+          "question": "If the second stage rises from 40 to 65 units/h, capacities become 60,65,70. The new ceiling is:",
+          "options": [
+            "60 units/h",
+            "65 units/h",
+            "70 units/h"
+          ],
+          "answer": 0,
+          "explanation": "Stage one becomes the new capacity limitation at 60 units per hour."
+        },
+        {
+          "question": "Which measure best checks whether improvement succeeded?",
+          "options": [
+            "Maximum local speed of one workstation",
+            "Completed end-to-end output",
+            "How busy each operator looks"
+          ],
+          "answer": 1,
+          "explanation": "System throughput shows whether more finished units reach the customer."
+        },
+        {
+          "question": "Why might a queue build before a constrained workstation?",
+          "options": [
+            "The downstream process is slower than incoming work",
+            "There is no work arriving",
+            "Every workstation has equal capacity"
+          ],
+          "answer": 0,
+          "explanation": "Items arrive faster than the constrained stage can process them."
+        },
+        {
+          "question": "Why should simple station capacities be interpreted cautiously?",
+          "options": [
+            "Variability and downtime may affect realised throughput",
+            "Real systems have no queues",
+            "All processes are always perfectly balanced"
+          ],
+          "answer": 0,
+          "explanation": "Real operating conditions cause departure from ideal steady-state calculations."
+        }
+      ],
+      "sources": [
+        {
+          "label": "MIT OpenCourseWare — Operations Management",
+          "url": "https://ocw.mit.edu/courses/15-760a-operations-management-summer-2002/"
+        }
+      ]
+    }
+  ]
+}
