@@ -1,386 +1,180 @@
-(() => {
-  'use strict';
-
-  const KEY = 'knowledge-stash-v1';
-  const CATEGORIES = ['All', 'Psychology', 'Science', 'Engineering', 'Space', 'Philosophy', 'Business', 'Faith & ideas', 'History'];
-  const ICONS = {'Psychology':'◉','Science':'⚛','Engineering':'⚙','Space':'✧','Philosophy':'◇','Business':'↗','Faith & ideas':'✺','History':'⌛'};
-  const INTERVALS = [1, 3, 7, 14, 30];
-  const app = document.getElementById('app-content');
-  const overlay = document.getElementById('overlay');
-  const dialog = document.getElementById('dialog');
-  const toast = document.getElementById('toast');
-  let toastTimeout;
-  let selection = 'All';
-  let searchTerm = '';
-  let returnFocus = null;
-  let state = load();
-
-  function freshState() { return {saved:[], learned:{}, reviews:{}, history:[], custom:[], theme:'light'}; }
-  function load() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (saved && typeof saved === 'object') return {...freshState(), ...saved};
-    } catch (err) { console.warn('Storage unavailable:', err); }
-    return freshState();
-  }
-  function persist() {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch (err) { notify('Storage unavailable. Export a backup before leaving.'); }
-  }
-  function escapeHTML(value) {
-    return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  }
-  function textValue(value, max=1600) { return String(value ?? '').trim().slice(0, max); }
-  function dateKey(date=new Date()) {
-    return [date.getFullYear(), String(date.getMonth()+1).padStart(2,'0'), String(date.getDate()).padStart(2,'0')].join('-');
-  }
-  function offsetDate(days, from=new Date()) {
-    const d = new Date(from.getFullYear(), from.getMonth(), from.getDate()+days,12);
-    return dateKey(d);
-  }
-  function allIdeas() { return [...window.STARTER_IDEAS, ...(Array.isArray(state.custom) ? state.custom : [])]; }
-  function byId(id) { return allIdeas().find(idea => idea.id === id); }
-  function isSaved(id) { return Array.isArray(state.saved) && state.saved.includes(id); }
-  function isLearned(id) { return !!state.learned?.[id]; }
-  function dueIdeas() {
-    return allIdeas().filter(idea => state.reviews?.[idea.id]?.due && state.reviews[idea.id].due <= dateKey());
-  }
-  function dayIndex() {
-    const d = new Date();
-    const ordinal = Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000;
-    return Math.floor(ordinal);
-  }
-  function todaysIdeas() {
-    const items = allIdeas();
-    if (!items.length) return [];
-    const start = ((dayIndex()*3) % items.length + items.length) % items.length;
-    return Array.from({length:Math.min(3,items.length)},(_,n)=>items[(start+n)%items.length]);
-  }
-  function daysActive() {
-    return new Set((Array.isArray(state.history) ? state.history : []).map(entry => entry.day));
-  }
-  function streak() {
-    const days = daysActive();
-    let date = new Date();
-    if (!days.has(dateKey(date))) date.setDate(date.getDate()-1);
-    let total = 0;
-    while (days.has(dateKey(date))) { total++; date.setDate(date.getDate()-1); }
-    return total;
-  }
-  function activity(type) {
-    state.history ||= [];
-    state.history.push({day:dateKey(), type});
-    state.history = state.history.slice(-1200);
-  }
-  function notify(message) {
-    toast.textContent = message;
-    toast.classList.add('show');
-    clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(()=>toast.classList.remove('show'), 2600);
-  }
-  function ideaCard(idea) {
-    const learned = isLearned(idea.id);
-    return `<button class="idea-card" data-open="${escapeHTML(idea.id)}" aria-label="Read ${escapeHTML(idea.title)}">
-      <span class="card-art" data-category="${escapeHTML(idea.category)}" aria-hidden="true">${ICONS[idea.category] || '✦'}</span>
-      <span class="idea-card-body">
-        <span class="card-meta"><span class="badge">${escapeHTML(idea.category)}</span><span>2 min read</span>${learned?'<span>✓ Learned</span>':''}</span>
-        <h3>${escapeHTML(idea.title)}</h3>
-        <p>${escapeHTML(idea.hook)}</p>
-      </span><span class="arrow" aria-hidden="true">›</span>
-    </button>`;
-  }
-  function empty(icon,title,description,buttonHtml='') {
-    return `<div class="empty"><span class="emoji" aria-hidden="true">${icon}</span><strong>${title}</strong><p>${description}</p>${buttonHtml}</div>`;
-  }
-  function heading(kicker,title,description='') {
-    return `<div class="kicker">${kicker}</div><h1>${title}</h1>${description?`<p class="subtext">${description}</p>`:''}`;
-  }
-
-  function renderToday() {
-    const picks = todaysIdeas();
-    const feature = picks[0];
-    const done = picks.filter(idea => isLearned(idea.id)).length;
-    const percentage = Math.round((done / Math.max(1,picks.length))*100);
-    app.innerHTML = `<div class="page">
-      ${heading('A little learning, every day','Grow your mind.','Short ideas, useful insights, and a few minutes well spent.')}
-      <section class="hero" aria-label="Today’s featured idea">
-        <div class="hero-content"><div class="hero-top">✦ &nbsp; Today’s idea</div>
-          <h2>${escapeHTML(feature.title)}</h2><p>${escapeHTML(feature.hook)}</p>
-          <button class="light-button" data-open="${escapeHTML(feature.id)}">${isLearned(feature.id)?'Read again':'Start learning'} <span aria-hidden="true">→</span></button>
-        </div>
-      </section>
-      <div class="stat-row">
-        <div class="stat-card"><strong>${streak()} <span aria-hidden="true">🔥</span></strong><span>Day streak</span></div>
-        <div class="stat-card"><strong>${Object.keys(state.learned||{}).length} <span aria-hidden="true">✦</span></strong><span>Ideas learned</span></div>
-      </div>
-      <div class="progress-card">
-        <div class="progress-header"><strong>Today's 3 ideas</strong><span>${done}/${picks.length} complete</span></div>
-        <div class="progress-track" role="progressbar" aria-label="Today's ideas completed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}"><div class="progress-fill" style="width:${percentage}%"></div></div>
-        <p class="progress-caption">${done === picks.length?'Great work! Come back tomorrow for another selection.':'No rush. Small steps build lasting knowledge.'}</p>
-      </div>
-      <div class="section-head"><h2>More to discover</h2><a class="text-link" href="#discover">See all →</a></div>
-      <div class="cards">${picks.slice(1).map(ideaCard).join('')}</div>
-      <div class="tip-card"><strong>✦ Make these ideas your own</strong><p>Ask ChatGPT for more learning cards, then add them with the + button. No paid API or extra subscription needed.</p></div>
-    </div>`;
-  }
-
-  function renderDiscover() {
-    app.innerHTML = `<div class="page">
-      ${heading('Explore the library','Follow your curiosity.','Browse small ideas across eight subjects.')}
-      <input id="search" class="searchbox" type="search" placeholder="Search ideas and topics…" autocomplete="off" aria-label="Search knowledge cards" value="${escapeHTML(searchTerm)}">
-      <div class="chips" id="category-chips" aria-label="Filter by category">${CATEGORIES.map(cat=>`<button class="chip ${selection===cat?'selected':''}" data-cat="${escapeHTML(cat)}" aria-pressed="${selection===cat}">${escapeHTML(cat)}</button>`).join('')}</div>
-      <p class="count-label" id="results-count"></p>
-      <div class="cards" id="discover-results"></div>
-    </div>`;
-    refreshDiscover();
-  }
-  function refreshDiscover() {
-    const term = searchTerm.toLocaleLowerCase();
-    const ideas = allIdeas().filter(idea => (selection==='All'||idea.category===selection)
-      && [idea.title,idea.hook,idea.body,idea.category,idea.takeaway].some(x=>x.toLocaleLowerCase().includes(term)));
-    document.getElementById('results-count').textContent = `${ideas.length} ${ideas.length===1?'idea':'ideas'} available`;
-    document.getElementById('discover-results').innerHTML = ideas.length ? ideas.map(ideaCard).join('') :
-      empty('⌕','No matching ideas','Try another search or choose a different category.');
-  }
-
-  function renderStash() {
-    const ideas = allIdeas().filter(idea => isSaved(idea.id));
-    app.innerHTML = `<div class="page">
-      ${heading('Your personal collection','My Stash.','Save the ideas you want to return to.')}
-      <div class="section-head"><h2>${ideas.length} saved ${ideas.length===1?'idea':'ideas'}</h2><button class="text-link" data-action="add">＋ Add idea</button></div>
-      <div class="cards">${ideas.length ? ideas.map(ideaCard).join('') : empty('▣','Nothing saved yet','Find a topic you like and tap “Save” while reading.', '<a href="#discover" class="primary">Explore ideas →</a>')}</div>
-    </div>`;
-  }
-
-  function renderReview() {
-    const due = dueIdeas();
-    const upcoming = allIdeas().filter(idea=>state.reviews?.[idea.id]?.due && state.reviews[idea.id].due > dateKey())
-      .sort((a,b)=>state.reviews[a.id].due.localeCompare(state.reviews[b.id].due)).slice(0,4);
-    app.innerHTML = `<div class="page">
-      ${heading('Keep what you learn','Review & remember.','A small reminder today makes an idea easier to recall later.')}
-      <div class="progress-card" style="margin-top:19px">
-        <div class="progress-header"><strong>Ready to review</strong><span>${due.length} due</span></div>
-        <p class="subtext" style="margin:0">Ideas come back after 1, 3, 7, 14 and 30 days. Try recalling each idea before opening the card, then check yourself.</p>
-      </div>
-      <div class="section-head"><h2>Due today</h2></div>
-      <div class="cards">${due.length ? due.map(ideaCard).join('') : empty('✓',"You're all caught up",'When you mark an idea as learned, it will appear here for review tomorrow.', '<a href="#discover" class="primary">Learn something new →</a>')}</div>
-      ${upcoming.length ? `<div class="section-head"><h2>Coming up</h2></div><div class="cards">${upcoming.map(ideaCard).join('')}</div>`:''}
-    </div>`;
-  }
-
-  function render() {
-    document.documentElement.classList.toggle('dark', state.theme === 'dark');
-    const route = location.hash.replace('#','') || 'today';
-    const current = ['today','discover','stash','review'].includes(route)?route:'today';
-    document.querySelectorAll('[data-tab]').forEach(el => {
-      const active = el.dataset.tab === current;
-      el.classList.toggle('active',active);
-      if (active) el.setAttribute('aria-current','page'); else el.removeAttribute('aria-current');
-    });
-    ({today:renderToday,discover:renderDiscover,stash:renderStash,review:renderReview})[current]();
-  }
-
-  function showDialog(content, label) {
-    returnFocus = document.activeElement;
-    dialog.innerHTML = content;
-    dialog.setAttribute('aria-label',label);
-    overlay.hidden = false;
-    document.body.style.overflow = 'hidden';
-    dialog.querySelector('[data-action="close"]')?.focus();
-  }
-  function closeDialog() {
-    overlay.hidden = true;
-    dialog.innerHTML = '';
-    document.body.style.overflow = '';
-    if (returnFocus?.isConnected) returnFocus.focus();
-  }
-  function dialogHeader(title) {
-    return `<div class="dialog-head"><span class="kicker">${title}</span><button class="close-button" data-action="close" aria-label="Close">×</button></div>`;
-  }
-  function openIdea(id) {
-    const idea = byId(id); if (!idea) return;
-    const due = state.reviews?.[id]?.due <= dateKey();
-    showDialog(`${dialogHeader('2-minute learning card')}
-      <span class="badge">${escapeHTML(idea.category)}</span>
-      <h2 class="detail-title">${escapeHTML(idea.title)}</h2>
-      <p class="detail-hook">${escapeHTML(idea.hook)}</p>
-      <div class="detail-section"><small>The idea</small><p>${escapeHTML(idea.body)}</p></div>
-      <div class="detail-section"><small>Real-world example</small><p>${escapeHTML(idea.example)}</p></div>
-      <div class="detail-section takeaway"><small>Key takeaway</small><p>${escapeHTML(idea.takeaway)}</p></div>
-      <div class="detail-section"><small>Think a little deeper</small><p>${escapeHTML(idea.question)}</p></div>
-      <div class="actions">
-        <button class="secondary" data-save="${escapeHTML(id)}">${isSaved(id)?'✓ Saved':'▣ Save idea'}</button>
-        ${!isLearned(id)?`<button class="primary" data-learn="${escapeHTML(id)}">✓ Mark learned</button>`:
-        due?`<button class="primary" data-review="${escapeHTML(id)}" data-result="good">✓ I remembered</button>
-             <button class="secondary" data-review="${escapeHTML(id)}" data-result="again">↻ Review tomorrow</button>`:
-           `<button class="secondary" disabled>✓ Learned · Next review ${escapeHTML(state.reviews[id]?.due||'soon')}</button>`}
-      </div>`, idea.title);
-  }
-  function toggleSaved(id) {
-    if (!byId(id)) return;
-    state.saved ||= [];
-    if (isSaved(id)) { state.saved = state.saved.filter(x=>x!==id); notify('Removed from My Stash'); }
-    else { state.saved.push(id); notify('Saved to My Stash'); }
-    persist(); render(); openIdea(id);
-  }
-  function learn(id) {
-    if (!byId(id) || isLearned(id)) return;
-    state.learned[id] = dateKey();
-    state.reviews[id] = {step:0, due:offsetDate(INTERVALS[0])};
-    activity('learn'); persist(); render(); openIdea(id);
-    notify('Idea learned. You’ll review it tomorrow.');
-  }
-  function review(id, result) {
-    const record = state.reviews?.[id];
-    if (!record || record.due > dateKey()) return;
-    record.step = result === 'good' ? Math.min((Number(record.step)||0)+1, INTERVALS.length-1) : 0;
-    record.due = offsetDate(INTERVALS[record.step]);
-    activity('review'); persist(); render(); closeDialog();
-    notify(result==='good'?'Well remembered! Review scheduled.':'No problem. Try again tomorrow.');
-  }
-
-  function addModal() {
-    showDialog(`${dialogHeader('Build your collection')}
-      <h2 style="font-size:24px;letter-spacing:-.65px;margin-bottom:5px">Add a new idea</h2>
-      <p class="subtext">Write one yourself, or use ChatGPT to create more.</p>
-      <form id="add-form">
-        <label class="form-field">Title *<input name="title" maxlength="110" required placeholder="e.g. Why friction matters"></label>
-        <label class="form-field">Category <select name="category">${CATEGORIES.slice(1).map(x=>`<option>${escapeHTML(x)}</option>`).join('')}</select></label>
-        <label class="form-field">Interesting opening *<textarea name="hook" maxlength="250" required placeholder="One sentence that makes me curious"></textarea></label>
-        <label class="form-field">Explanation *<textarea name="body" maxlength="1600" required placeholder="Explain the concept clearly"></textarea></label>
-        <label class="form-field">Real-world example <textarea name="example" maxlength="900" placeholder="How does this appear in real life?"></textarea></label>
-        <label class="form-field">Key takeaway *<textarea name="takeaway" maxlength="300" required placeholder="What should I remember?"></textarea></label>
-        <label class="form-field">Reflection question <input name="question" maxlength="300" placeholder="What could I explore next?"></label>
-        <button class="primary" style="width:100%" type="submit">＋ Add to library</button>
-      </form>
-      <div class="hint-panel"><h3>✦ Generate ideas in ChatGPT, free</h3>
-        <p>Copy a ready-made prompt. Ask ChatGPT for JSON learning cards, then paste the result below. No API key or payment needed.</p>
-        <button class="secondary" data-action="copy-prompt">Copy ChatGPT prompt</button>
-        <label class="form-field" style="margin-bottom:8px">Paste JSON array<textarea id="bulk-input" rows="4" placeholder='[{"title":"...","category":"Science","hook":"...","body":"...","example":"...","takeaway":"...","question":"..."}]'></textarea></label>
-        <button class="secondary" data-action="import-cards">Import generated cards</button>
-        <p class="form-hint" style="margin:8px 0 0">Tip: Review generated facts for accuracy before saving.</p>
-      </div>`, 'Add a new idea');
-  }
-  function validateIdea(source) {
-    if (!source || typeof source !== 'object') return null;
-    const title = textValue(source.title,110), hook = textValue(source.hook,250);
-    const body = textValue(source.body,1600), takeaway = textValue(source.takeaway,300);
-    if (!title || !hook || !body || !takeaway) return null;
-    const category = CATEGORIES.includes(source.category)&&source.category!=='All'?source.category:'Science';
-    return {id:`own-${Date.now()}-${Math.floor(Math.random()*1e9)}`,title,hook,body,takeaway,category,
-      example:textValue(source.example,900)||'Think of a situation where this idea appears.',
-      question:textValue(source.question,300)||'Where might this idea be useful?'};
-  }
-  function createIdea(form) {
-    const idea = validateIdea(Object.fromEntries(new FormData(form).entries()));
-    if (!idea) {notify('Complete the required fields.');return;}
-    state.custom.push(idea); persist(); closeDialog(); location.hash = '#stash';
-    state.saved ||= []; state.saved.push(idea.id); persist(); render();
-    notify('Idea added and saved.');
-  }
-  const CARD_PROMPT = `Create 5 accurate, fascinating, beginner-friendly microlearning cards about [TOPIC]. Each card should be readable in roughly 1–2 minutes. Return ONLY a valid JSON array, no markdown fences. Each object must have exactly these string fields: "title", "category", "hook", "body", "example", "takeaway", "question". Allowed categories: Psychology, Science, Engineering, Space, Philosophy, Business, Faith & ideas, History. Make each explanation specific, not generic; distinguish established facts from hypotheses and avoid made-up statistics. Max 1,000 characters for "body". I will paste this JSON into my offline Knowledge Stash app.`;
-  async function copyPrompt() {
-    try { await navigator.clipboard.writeText(CARD_PROMPT); notify('Prompt copied. Paste it into ChatGPT.'); }
-    catch { showDialog(`${dialogHeader('Copy this ChatGPT prompt')}<textarea class="searchbox" readonly style="height:280px">${escapeHTML(CARD_PROMPT)}</textarea>`, 'ChatGPT prompt'); }
-  }
-  function bulkImport() {
-    const input = document.getElementById('bulk-input');
-    try {
-      const value = JSON.parse(input.value.trim());
-      if (!Array.isArray(value) || !value.length || value.length>100) throw Error('Need an array of 1–100 cards');
-      const valid = value.map(validateIdea);
-      if (valid.some(x=>!x)) throw Error('Each card needs title, hook, body and takeaway');
-      state.custom.push(...valid);
-      persist(); closeDialog(); location.hash = '#discover'; render();
-      notify(`Imported ${valid.length} learning ${valid.length===1?'card':'cards'}!`);
-    } catch (error) {notify(`Import failed: ${String(error.message).slice(0,80)}`);}
-  }
-  function settingsModal() {
-    showDialog(`${dialogHeader('Preferences and data')}
-      <h2 style="font-size:24px;margin-bottom:5px">Settings</h2>
-      <p class="subtext">Everything stays on this device unless you export a backup.</p>
-      <div class="toggle-row"><label for="dark-toggle">Dark mode</label><input id="dark-toggle" type="checkbox" ${state.theme==='dark'?'checked':''}></div>
-      <div class="section-head"><h2>Your data</h2></div>
-      <p class="subtext">${allIdeas().length} cards (${state.custom.length} added by you), ${state.saved.length} saved, ${Object.keys(state.learned).length} learned.</p>
-      <div class="actions"><button class="primary" data-action="export">↓ Export backup</button><button class="secondary" data-action="choose-backup">↑ Restore backup</button></div>
-      <input hidden type="file" id="backup-file" accept="application/json,.json">
-      <p class="form-hint" style="margin:10px 0 20px">Backups are JSON files. Restoring replaces data currently saved in this browser.</p>
-      <div class="hint-panel"><h3>Free & private by design</h3><p>No ads, logins, analytics or external APIs. Your saved ideas and learning progress are stored locally in your browser. They will not sync automatically between phones.</p></div>
-      <button class="secondary" data-action="reset" style="color:#d26364">Delete my saved data</button>
-    `, 'Settings');
-  }
-  function exportBackup() {
-    const blob = new Blob([JSON.stringify({format:'knowledge-stash-backup',version:1,exported: new Date().toISOString(),state},null,2)],{type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href=url;link.download=`knowledge-stash-backup-${dateKey()}.json`;
-    document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
-    notify('Backup exported. Keep it somewhere safe.');
-  }
-  async function restoreBackup(file) {
-    try {
-      if (file.size>3_000_000) throw Error('File is too large');
-      const json = JSON.parse(await file.text());
-      if (json.format!=='knowledge-stash-backup' || json.version!==1 || typeof json.state!=='object') throw Error('Not a Knowledge Stash backup');
-      if (!confirm('Replace the learning data stored on this device with this backup?')) return;
-      const incoming = json.state;
-      const custom = (Array.isArray(incoming.custom)?incoming.custom:[]).slice(0,500).map(raw=>{
-        const idea = validateIdea(raw);
-        if (idea && typeof raw?.id === 'string' && /^own-\d+-\d+$/.test(raw.id)) idea.id = raw.id;
-        return idea;
-      }).filter(Boolean);
-      const validIds = new Set([...window.STARTER_IDEAS,...custom].map(x=>x.id));
-      const safeObject = value => value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-      state = {
-        saved:(Array.isArray(incoming.saved)?incoming.saved:[]).filter(x=>validIds.has(x)),
-        learned:Object.fromEntries(Object.entries(safeObject(incoming.learned)).filter(([id,v])=>validIds.has(id)&&typeof v==='string')),
-        reviews:Object.fromEntries(Object.entries(safeObject(incoming.reviews)).filter(([id,v])=>validIds.has(id)&&v&&typeof v.due==='string'&&/\d{4}-\d\d-\d\d/.test(v.due)).map(([id,v])=>[id,{step:Math.max(0,Math.min(4,Number(v.step)||0)),due:v.due}])),
-        history:(Array.isArray(incoming.history)?incoming.history:[]).filter(x=>x&&typeof x.day==='string'&&/^\d{4}-\d\d-\d\d$/.test(x.day)).slice(-1200),
-        custom,theme:incoming.theme==='dark'?'dark':'light'
-      };
-      persist();closeDialog();render();notify('Backup restored.');
-    } catch (err) { notify(`Restore failed: ${String(err.message).slice(0,80)}`); }
-  }
-  function reset() {
-    if (!confirm('Delete all saved ideas, custom cards and learning progress from this device? Export a backup first if you want to keep them.')) return;
-    state = freshState(); persist(); closeDialog();render();notify('Local learning data cleared.');
-  }
-
-  document.getElementById('open-add').addEventListener('click',addModal);
-  document.getElementById('open-settings').addEventListener('click',settingsModal);
-  window.addEventListener('hashchange',()=>{closeDialog();render();window.scrollTo(0,0);});
-  document.addEventListener('keydown', event=>{if(event.key==='Escape'&&!overlay.hidden)closeDialog();});
-  overlay.addEventListener('click',event=>{if(event.target===overlay)closeDialog();});
-  document.addEventListener('submit',event=>{
-    if (event.target.id==='add-form') {event.preventDefault();createIdea(event.target);}
-  });
-  document.addEventListener('input',event=>{
-    if(event.target.id==='search'){searchTerm=event.target.value;refreshDiscover();}
-  });
-  document.addEventListener('change',event=>{
-    if(event.target.id==='dark-toggle'){state.theme=event.target.checked?'dark':'light';persist();document.documentElement.classList.toggle('dark',state.theme==='dark');}
-    if(event.target.id==='backup-file' && event.target.files?.[0]) restoreBackup(event.target.files[0]);
-  });
-  document.addEventListener('click', event=>{
-    const opened = event.target.closest('[data-open]'); if(opened) {openIdea(opened.dataset.open);return;}
-    const save = event.target.closest('[data-save]'); if(save) {toggleSaved(save.dataset.save);return;}
-    const learnButton = event.target.closest('[data-learn]'); if(learnButton) {learn(learnButton.dataset.learn);return;}
-    const reviewButton = event.target.closest('[data-review]'); if(reviewButton) {review(reviewButton.dataset.review, reviewButton.dataset.result);return;}
-    const chip = event.target.closest('[data-cat]');
-    if(chip){selection=chip.dataset.cat;document.querySelectorAll('[data-cat]').forEach(el=>{const yes=el.dataset.cat===selection;el.classList.toggle('selected',yes);el.setAttribute('aria-pressed',yes);});refreshDiscover();return;}
-    const action = event.target.closest('[data-action]')?.dataset.action;
-    if(!action)return;
-    if(action==='close')closeDialog();
-    if(action==='add')addModal();
-    if(action==='copy-prompt')copyPrompt();
-    if(action==='import-cards')bulkImport();
-    if(action==='export')exportBackup();
-    if(action==='choose-backup')document.getElementById('backup-file')?.click();
-    if(action==='reset')reset();
-  });
-
-  if(!location.hash) history.replaceState(null,'','#today');
-  render();
-  if ('serviceWorker' in navigator && ['http:','https:'].includes(location.protocol)) {
-    window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Offline cache unavailable',err)));
-  }
+/* Knowledge Stash v0.2 — no frameworks, trackers, API or server required. */
+(()=>{'use strict';
+const KEY='knowledge-stash-v2',OLD='knowledge-stash-v1',INTERVALS=[1,3,7,14,30];
+const CATS=['All','Psychology','Science','Engineering','Space','Philosophy','Business','Faith & ideas','History'];
+const ICONS={Psychology:'🧠',Science:'🔬',Engineering:'⚙️',Space:'🌌',Philosophy:'◇',Business:'📈','Faith & ideas':'✦',History:'🕰️'};
+const app=document.getElementById('app-content'),overlay=document.getElementById('overlay'),dialog=document.getElementById('dialog'),toast=document.getElementById('toast');
+const builtin=window.KS_BUILTIN||[], starter=window.STARTER_IDEAS||[];
+let selection='All',searchTerm='',libraryTab='Lessons',packLessons=[],state,opened=null,mode='learn',answers={},importFile=null;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const str=(x,max=4000)=>String(x??'').trim().slice(0,max);
+const obj=x=>x&&typeof x==='object'&&!Array.isArray(x)?x:{};
+const uniq=a=>[...new Set(a)];
+const dateKey=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const plusDays=(n,base=new Date())=>{const d=new Date(base.getFullYear(),base.getMonth(),base.getDate()+n,12);return dateKey(d)};
+const nowISO=()=>new Date().toISOString();
+const dayGap=(a,b)=>Math.floor((Date.parse(`${b}T12:00:00Z`)-Date.parse(`${a}T12:00:00Z`))/86400000);
+function notice(t){toast.textContent=t;toast.classList.add('show');clearTimeout(notice.timer);notice.timer=setTimeout(()=>toast.classList.remove('show'),3800)}
+function emptyState(){return {schemaVersion:2,saved:[],learned:{},reviews:{},history:[],custom:[],theme:'light',customLessons:[],lessonProgress:{},migration:{from:0}};}
+function validateOld(s){const v=obj(s);const copy=emptyState();copy.saved=Array.isArray(v.saved)?v.saved.filter(x=>typeof x==='string').slice(0,1500):[];copy.learned=obj(v.learned);copy.reviews=obj(v.reviews);copy.history=Array.isArray(v.history)?v.history.slice(-1200):[];copy.custom=Array.isArray(v.custom)?v.custom.slice(0,500):[];copy.theme=v.theme==='dark'?'dark':'light';copy.migration={from:1,at:nowISO()};return copy;}
+function migrate(){try{const existing=localStorage.getItem(KEY);if(existing){const parsed=JSON.parse(existing);if(!parsed||parsed.schemaVersion!==2)throw Error('Invalid v0.2 data');const safe=emptyState();return {...safe,...parsed,saved:Array.isArray(parsed.saved)?parsed.saved:[],custom:Array.isArray(parsed.custom)?parsed.custom:[],customLessons:Array.isArray(parsed.customLessons)?parsed.customLessons:[],lessonProgress:obj(parsed.lessonProgress),history:Array.isArray(parsed.history)?parsed.history:[]};}
+ const legacy=localStorage.getItem(OLD);if(legacy){const previous=JSON.parse(legacy);const converted=validateOld(previous);localStorage.setItem(KEY,JSON.stringify(converted));return converted;}
+ return emptyState();}catch(e){console.error('Storage read/migration issue — keeping original data:',e);setTimeout(()=>notice('Could not read old progress. Your original v0.1 data was not changed; export a backup before continuing.'),400);return emptyState();}}
+state=migrate();
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));return true;}catch(e){console.error(e);notice('Storage full or blocked. Export backup; latest change may not persist.');return false}}
+const allLessons=()=>{const choices=new Map();for(const l of [...builtin,...packLessons,...state.customLessons]){const prev=choices.get(l.id);if(!prev||l.version>=prev.version)choices.set(l.id,l)}return [...choices.values()]};
+const allIdeas=()=>[...starter,...state.custom];
+const findLesson=id=>allLessons().find(x=>x.id===id);
+const findIdea=id=>allIdeas().find(x=>x.id===id);
+function validContentId(id){return typeof id==='string'&&/^[a-z0-9][a-z0-9-]{2,63}$/.test(id)}
+function validLesson(source){
+ const x=obj(source);if(!validContentId(x.id))throw Error('Lesson id must be 3–64 lowercase letters, numbers or hyphens');
+ if(!Number.isInteger(x.version)||x.version<1||x.version>99999)throw Error('Lesson needs an integer version (1 or higher)');
+ for(const field of ['title','hook','model','category'])if(typeof x[field]!=='string'||!x[field].trim())throw Error(`Missing lesson ${field}`);
+ if(!CATS.includes(x.category)||x.category==='All')throw Error(`Unsupported category: ${x.category}`);
+ if(!['concept','system','investigation','skill','historical'].includes(x.model))throw Error('model must be concept, system, investigation, skill or historical');
+ if(x.title.length>140||x.hook.length>350)throw Error('Title or hook too long');
+ if(!Array.isArray(x.stages)||x.stages.length<3||x.stages.length>8)throw Error('Need 3–8 teaching stages');
+ if(!Array.isArray(x.quiz)||x.quiz.length<5||x.quiz.length>12)throw Error('Need 5–12 assessment questions');
+ const stages=x.stages.map((s,i)=>{if(typeof s.title!=='string'||!s.title.trim()||s.title.length>120)throw Error(`Stage ${i+1}: invalid title`);
+ if(!Array.isArray(s.paragraphs)||s.paragraphs.length<2||s.paragraphs.length>8||s.paragraphs.some(p=>typeof p!=='string'||p.length<30||p.length>1600))throw Error(`Stage ${i+1}: provide 2–8 substantive paragraphs`);
+ const item={title:s.title,paragraphs:s.paragraphs};if(s.takeaway)item.takeaway=str(s.takeaway,450);
+ if(s.visual){const v=obj(s.visual),t=v.type;if(!['market','memory','relativity','longitude','reynolds','flow','sequence','timing','faultcases','comparison','argument','perspectives','timeline'].includes(t))throw Error(`Stage ${i+1}: unsupported visual type`);
+ item.visual={type:t};if(t==='sequence'&&Array.isArray(v.labels))item.visual.labels=v.labels.slice(0,7).map(y=>str(y,80));
+ if(t==='comparison'){item.visual.left=str(v.left,300);item.visual.right=str(v.right,300)};
+ }
+ if(Array.isArray(s.bullets))item.bullets=s.bullets.slice(0,8).map(y=>str(y,400));return item;});
+ const quiz=x.quiz.map((q,i)=>{if(typeof q.question!=='string'||q.question.length<10||q.question.length>500||!Array.isArray(q.options)||q.options.length<2||q.options.length>5||q.options.some(o=>typeof o!=='string'||!o||o.length>350)||!Number.isInteger(q.answer)||q.answer<0||q.answer>=q.options.length||typeof q.explanation!=='string'||q.explanation.length<15||q.explanation.length>900)throw Error(`Question ${i+1} is invalid`);
+ return {question:q.question,options:q.options,answer:q.answer,explanation:q.explanation};});
+ if(!Array.isArray(x.sources)||!x.sources.length||x.sources.length>12)throw Error('At least one credible source link required');
+ const sources=x.sources.map(s=>{if(typeof s.label!=='string'||!s.label||s.label.length>180||typeof s.url!=='string')throw Error('Invalid source');let u;try{u=new URL(s.url)}catch{throw Error('Source URL invalid')}if(u.protocol!=='https:')throw Error('Sources must use HTTPS');return {label:s.label,url:u.href}});
+ return {id:x.id,version:x.version,title:x.title,hook:x.hook,model:x.model,category:x.category,level:str(x.level||'Intermediate',50),minutes:Math.max(1,Math.min(40,Number(x.minutes)||10)),stages,quiz,sources};
+}
+function validatePack(content){const root=obj(content);if(root.format!=='knowledge-stash-lesson-pack'||root.schemaVersion!==2||!Array.isArray(root.lessons)||root.lessons.length>40)throw Error('Expected pack format knowledge-stash-lesson-pack, schemaVersion 2, lessons array (max 40)');const ls=root.lessons.map(validLesson);if(new Set(ls.map(l=>l.id)).size!==ls.length)throw Error('Duplicate lesson IDs inside pack');return ls}
+function lessonRecord(lesson){let rec=state.lessonProgress[lesson.id];if(!rec||rec.version!==lesson.version){rec={version:lesson.version,stage:0,visited:[],completed:false,understood:false,bestScore:0,attempts:[],nextReview:null,reviewStep:0,reviewPasses:0,firstPassed:null,retained:false,started:nowISO(),finished:null};state.lessonProgress[lesson.id]=rec;persist();}return rec;}
+function getRecord(lesson){const p=state.lessonProgress[lesson.id];return p?.version===lesson.version?p:null;}
+function activity(type){state.history.push({day:dateKey(),type});state.history=state.history.slice(-1200);persist()}
+function streak(){const seen=new Set(state.history.filter(h=>h&&typeof h.day==='string').map(h=>h.day));let d=new Date();let count=0;if(!seen.has(dateKey(d)))d.setDate(d.getDate()-1);while(seen.has(dateKey(d))){count++;d.setDate(d.getDate()-1)}return count}
+function saved(id){return state.saved.includes(id)}
+function toggleSave(id){state.saved=saved(id)?state.saved.filter(x=>x!==id):[...state.saved,id];persist();render();notice(saved(id)?'Saved to My Stash':'Removed from My Stash')}
+function overdue(rec){return rec?.nextReview&&rec.nextReview<=dateKey()}
+function status(l){const p=getRecord(l);if(!p)return 'New';if(p.retained)return 'Retention demonstrated';if(p.understood)return overdue(p)?'Review due':'Understood';if(p.completed)return 'Completed';return 'In progress'}
+function card(l,kind='lesson'){const isLesson=kind==='lesson',r=isLesson?getRecord(l):null;return `<button class="idea-card ${isLesson?'advanced-card':''}" data-${isLesson?'lesson':'idea'}="${esc(l.id)}"><span class="card-art" data-category="${esc(l.category)}">${ICONS[l.category]||'✦'}</span><span class="idea-card-body"><span class="card-meta"><span class="badge">${esc(l.category)}</span><span>${isLesson?`${esc(l.minutes)} min · Deep lesson`:'2 min · Quick idea'}</span>${isLesson&&r?`<span class="status-dot">${esc(status(l))}</span>`:''}</span><h3>${esc(l.title)}</h3><p>${esc(l.hook)}</p></span><span class="arrow">›</span></button>`}
+function heading(k,t,d){return `<div class="kicker">${k}</div><h1>${t}</h1><p class="subtext">${d}</p>`}
+function home(){const ls=allLessons();const cont=ls.filter(l=>{const p=getRecord(l);return p&&!p.completed}).sort((a,b)=>(getRecord(b)?.started||'').localeCompare(getRecord(a)?.started||''))[0];const day=Math.floor((new Date().setHours(12,0,0,0)-new Date(2026,0,1,12).getTime())/86400000);const featured=ls[((day%ls.length)+ls.length)%ls.length];const completed=ls.filter(l=>getRecord(l)?.completed).length,understood=ls.filter(l=>getRecord(l)?.understood).length,due=ls.filter(l=>overdue(getRecord(l))).length+allIdeas().filter(i=>state.reviews[i.id]?.due&&state.reviews[i.id].due<=dateKey()).length;
+ app.innerHTML=`<div class="page">${heading('Learn a little. Understand a lot.','Grow your mind.','Eight deep interactive lessons plus your quick-idea library. Entirely free and offline-friendly.')}
+ ${cont?`<div class="resume"><div class="kicker">Continue learning</div><h3>${esc(cont.title)}</h3><p class="subtext">Stage ${(getRecord(cont).stage||0)+1} of ${cont.stages.length}</p><button class="primary" data-lesson="${esc(cont.id)}">Continue →</button></div>`:''}
+ <section class="hero"><div class="hero-content"><div class="hero-top">✦ TODAY'S DEEP DIVE</div><h2>${esc(featured.title)}</h2><p>${esc(featured.hook)}</p><button class="light-button" data-lesson="${esc(featured.id)}">${getRecord(featured)?.completed?'Read lesson again':'Start 10-minute lesson'} →</button></div></section>
+ <div class="stat-row"><div class="stat-card"><strong>${completed}<span> / ${ls.length}</span></strong><span>Lessons completed</span></div><div class="stat-card"><strong>${understood} 🧠</strong><span>Lessons understood</span></div><div class="stat-card"><strong>${due} ↻</strong><span>Reviews due</span></div><div class="stat-card"><strong>${streak()} 🔥</strong><span>Activity streak</span></div></div>
+ <div class="section-head"><h2>Explore a new subject</h2><a href="#discover" class="text-link">See library →</a></div><div class="cards">${ls.filter(l=>l.id!==featured.id).slice(0,3).map(l=>card(l)).join('')}</div>
+ <div class="tip-card"><strong>＋ Add lessons whenever you want</strong><p>Use Add → Copy AI lesson prompt, generate a compatible JSON pack with ChatGPT, preview and import it. Export a backup so it travels with you.</p><button class="secondary" data-action="add">Import lessons →</button></div></div>`;
+}
+function discover(){app.innerHTML=`<div class="page">${heading('Your learning library','Discover.','Deep lessons when you want substance. Quick ideas when you have two minutes.')}<div class="segment"><button data-library="Lessons" class="${libraryTab==='Lessons'?'selected':''}">Deep lessons (${allLessons().length})</button><button data-library="Ideas" class="${libraryTab==='Ideas'?'selected':''}">Quick ideas (${allIdeas().length})</button></div><input id="search" class="searchbox" type="search" aria-label="Search the library" placeholder="Search subjects and topics…" value="${esc(searchTerm)}"><div class="chips">${CATS.map(c=>`<button class="chip ${selection===c?'selected':''}" data-cat="${esc(c)}" aria-pressed="${selection===c}">${esc(c)}</button>`).join('')}</div><div class="count-label" id="results-count"></div><div id="results" class="cards"></div><div class="tip-card"><strong>Can't find a topic?</strong><p>Generate a full teaching lesson with the saved AI prompt and add it in seconds.</p><button data-action="add" class="secondary">＋ Import new lesson</button></div></div>`;filterResults()}
+function filterResults(){const pool=libraryTab==='Lessons'?allLessons():allIdeas(),filtered=pool.filter(x=>(selection==='All'||x.category===selection)&&[x.title,x.hook,x.category].join(' ').toLowerCase().includes(searchTerm.trim().toLowerCase()));const out=document.getElementById('results');if(!out)return;out.innerHTML=filtered.length?filtered.map(x=>card(x,libraryTab==='Lessons'?'lesson':'idea')).join(''):`<div class="empty"><span class="emoji">⌕</span><strong>No matches</strong><p>Try another keyword or add your own topic.</p></div>`;document.getElementById('results-count').textContent=`${filtered.length} ${libraryTab==='Lessons'?'lessons':'ideas'} found`}
+function stash(){const items=[...allLessons().filter(x=>saved(x.id)).map(x=>card(x)),...allIdeas().filter(x=>saved(x.id)).map(x=>card(x,'idea'))];app.innerHTML=`<div class="page">${heading('Everything worth revisiting','My Stash.','Your saved lessons and ideas live on this device.')}
+ <div class="section-head"><h2>${items.length} saved</h2><button data-action="add" class="text-link">＋ Add</button></div><div class="cards">${items.length?items.join(''):'<div class="empty"><span class="emoji">▣</span><strong>No saved items</strong><p>Open any lesson or card, then tap Save.</p></div>'}</div></div>`}
+function reviewPage(){const lessonDue=allLessons().filter(l=>overdue(getRecord(l)));const ideaDue=allIdeas().filter(i=>state.reviews[i.id]?.due&&state.reviews[i.id].due<=dateKey());const future=allLessons().filter(l=>getRecord(l)?.nextReview&&!overdue(getRecord(l))).sort((a,b)=>getRecord(a).nextReview.localeCompare(getRecord(b).nextReview)).slice(0,6);
+ app.innerHTML=`<div class="page">${heading('Learn it. Remember it.','Review & recall.','Return to tested knowledge after a delay; a pass schedules the next review.')}
+ <div class="stat-row"><div class="stat-card"><strong>${lessonDue.length+ideaDue.length}</strong><span>Due now</span></div><div class="stat-card"><strong>${allLessons().filter(l=>getRecord(l)?.retained).length}</strong><span>Retention demonstrated</span></div></div>
+ <div class="section-head"><h2>Due for review</h2></div><div class="cards">${lessonDue.map(l=>`<div class="review-item">${card(l)}<button class="primary" data-review-lesson="${esc(l.id)}">Take review quiz →</button></div>`).join('')}${ideaDue.map(i=>card(i,'idea')).join('')||'<div class="empty"><span class="emoji">✓</span><strong>All caught up</strong><p>After you pass a lesson quiz, the first review becomes due tomorrow.</p></div>'}</div>
+ ${future.length?`<div class="section-head"><h2>Coming up</h2></div><div class="cards">${future.map(l=>`<div class="upcoming">${esc(l.title)}<span>${esc(getRecord(l).nextReview)}</span></div>`).join('')}</div>`:''}</div>`}
+function render(){document.documentElement.classList.toggle('dark',state.theme==='dark');const hash=decodeURIComponent(location.hash||'#today').slice(1),parts=hash.split('/'),tab=parts[0];document.getElementById('bottom-nav').hidden=tab==='lesson';document.body.classList.toggle('lesson-open',tab==='lesson');document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
+ if(tab==='lesson'&&parts[1]){opened=parts[1];renderLesson(parts[1]);return}({today:home,discover,stash,review:reviewPage}[tab]||home)();}
+function goto(hash){location.hash=hash;window.scrollTo(0,0);if(location.hash===hash)render()}
+function openModal(html,title='Details'){dialog.innerHTML=html;dialog.setAttribute('aria-label',title);overlay.hidden=false;document.body.classList.add('modal-open');setTimeout(()=>dialog.querySelector('button,input,textarea,select')?.focus(),0)}
+function closeModal(){overlay.hidden=true;dialog.replaceChildren();document.body.classList.remove('modal-open')}
+const modalTitle=t=>`<div class="dialog-head"><span class="kicker">${esc(t)}</span><button data-action="close" class="close-button" aria-label="Close">×</button></div>`;
+function ideaDialog(id){const x=findIdea(id);if(!x)return;const isLearned=!!state.learned[id],rec=state.reviews[id],due=isLearned&&rec?.due<=dateKey();openModal(`${modalTitle('Quick idea · 2 minutes')}<span class="badge">${esc(x.category)}</span><h2 class="detail-title">${esc(x.title)}</h2><p class="detail-hook">${esc(x.hook)}</p>${[['The idea',x.body],['Example',x.example],['Key takeaway',x.takeaway],['Think more deeply',x.question]].map(([h,t])=>`<div class="detail-section"><small>${h}</small><p>${esc(t||'')}</p></div>`).join('')}<div class="actions"><button class="secondary" data-save="${esc(id)}">${saved(id)?'✓ Saved':'▣ Save'}</button>${!isLearned?`<button class="primary" data-learn="${esc(id)}">Mark learned</button>`:due?`<button class="primary" data-old-review="${esc(id)}" data-result="good">I remembered</button><button class="secondary" data-old-review="${esc(id)}" data-result="again">Review tomorrow</button>`:`<span class="subtext">Next review ${esc(rec?.due||'soon')}</span>`}</div>`,'Quick idea')}
+function learnOld(id){if(!findIdea(id))return;state.learned[id]=dateKey();state.reviews[id]={step:0,due:plusDays(1)};activity('learn');closeModal();render();notice('Idea learned; next review tomorrow.')}
+function oldReview(id,result){const r=state.reviews[id];if(!r)return;if(result==='good')r.step=Math.min(4,(r.step||0)+1);else r.step=0;r.due=plusDays(result==='good'?INTERVALS[r.step]:1);activity('review');closeModal();render();notice('Review recorded')}
+function lessonView(id,isReview=false){const l=findLesson(id);if(!l){goto('#discover');notice('Lesson not found');return}const p=lessonRecord(l);if(isReview&&!overdue(p)){notice('Review is not due yet.');isReview=false}return {l,p,isReview,index:isReview?l.stages.length:Math.max(0,Math.min(l.stages.length,p.stage||0))};}
+function renderLesson(id){const isReview=location.hash.endsWith('/review');const view=lessonView(id,isReview);if(!view)return;const {l,p,index}=view,stepCount=l.stages.length;const isQuiz=index>=stepCount;const bar=Math.round(100*(isQuiz?stepCount:index)/stepCount);const s=l.stages[index];
+ const sources=l.sources.map(x=>`<a target="_blank" rel="noopener noreferrer" href="${esc(x.url)}">↗ ${esc(x.label)}</a>`).join('');
+ app.innerHTML=`<div class="page learning-page"><div class="lesson-top"><button class="secondary compact" data-action="leave-lesson">← Library</button><button class="secondary compact" data-save="${esc(l.id)}">${saved(l.id)?'✓ Saved':'▣ Save'}</button></div>
+ <div class="kicker">${esc(l.category)} · ${esc(l.model)} learning</div><h1 class="lesson-h1">${esc(l.title)}</h1><p class="subtext">${esc(l.hook)}</p>
+ <div class="lesson-progress"><div class="progress-header"><strong>${isQuiz?view.isReview?'Spaced review':'Knowledge assessment':`Stage ${index+1} of ${stepCount}`}</strong><span>${isQuiz?'Ready to test':`${bar}% of lesson`}</span></div><div class="progress-track"><div class="progress-fill" style="width:${bar}%"></div></div></div>
+ ${isQuiz?`<div class="lesson-body">${quizHTML(l,p,view.isReview,sources)}</div>`:
+ `<section class="lesson-body"><div class="kicker">${String(index+1).padStart(2,'0')} / ${String(stepCount).padStart(2,'0')} · ${esc(l.model)}</div><h2>${esc(s.title)}</h2>
+ ${s.paragraphs.map(x=>`<p>${esc(x)}</p>`).join('')}
+ ${s.visual?`<div class="visual-host"><div class="visual-title">INTERACTIVE / VISUAL EXPLANATION</div>${window.KSVisual?.html(s.visual)||''}</div>`:''}
+ ${s.bullets?.length?`<ul class="lesson-bullets">${s.bullets.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}
+ ${s.takeaway?`<div class="lesson-takeaway"><strong>✦ Keep this in mind</strong><p>${esc(s.takeaway)}</p></div>`:''}
+ <div class="stage-actions"><button class="secondary" data-stage="prev" ${index===0?'disabled':''}>← Previous</button><button class="primary" data-stage="next">${index===stepCount-1?'Take knowledge test →':'Next section →'}</button></div></section>`}
+ </div>`;
+ if(s?.visual)window.KSVisual?.activate(app,s.visual);
+ if(isQuiz&&p.attempts.length&&!view.isReview)showPreviousResult(p);document.title=`${l.title} — Knowledge Stash`;
+}
+function questionsFor(l,p,isReview){const q=l.quiz; // Rotate question order on later assessments, without changing their correct answers.
+ const shift=isReview?(p.reviewPasses+p.attempts.length)%q.length:0;return [...q.slice(shift),...q.slice(0,shift)];}
+function quizHTML(l,p,isReview,sources){const questions=questionsFor(l,p,isReview);return `<div class="kicker">${isReview?'SPACED RETRIEVAL':'PUT IT INTO PRACTICE'}</div><h2>${isReview?'What can you recall now?':'Prove your understanding'}</h2><p>Answer all ${questions.length} questions, then read the explanations. <strong>80% or higher</strong> demonstrates understanding. You can retry without penalty.</p>
+ ${!isReview?`<div class="actions"><button class="secondary" data-action="reread">← Revisit lesson stages</button></div>`:''}<form id="quiz-form" novalidate>${questions.map((q,i)=>`<fieldset class="quiz-question"><legend><strong>${i+1}.</strong> ${esc(q.question)}</legend>${q.options.map((opt,j)=>`<label class="choice"><input type="radio" name="q${i}" value="${j}"><span>${esc(opt)}</span></label>`).join('')}<div class="quiz-feedback" data-feedback="${i}" hidden></div></fieldset>`).join('')}<div class="actions"><button class="primary" type="submit">Check my answers →</button><button class="secondary" type="button" data-action="clear-answers">Clear answers</button></div></form><div id="quiz-result" role="status" aria-live="polite"></div>
+ <div class="source-box"><strong>📚 Sources & further reading</strong><p>External links require an internet connection. Lesson text and graphics remain offline.</p>${sources}</div><p class="form-hint">A quiz result records performance on these questions; it is not a guarantee of permanent mastery.</p>`;}
+function showPreviousResult(p){if(!p.attempts.length)return;const a=p.attempts[p.attempts.length-1];const host=document.getElementById('quiz-result');if(!host)return;host.innerHTML=`<div class="mini-results">Previous score: ${a.correct}/${a.total} (${a.percent}%). ${p.understood?'Understanding demonstrated.':'Try again after reviewing the explanations.'}</div>`}
+function moveStage(which){const id=opened,l=findLesson(id),p=l&&lessonRecord(l);if(!p)return;const max=l.stages.length;let i=p.stage;
+ if(which==='next'){if(i<max){p.visited=uniq([...p.visited,i]);p.stage=Math.min(max,i+1)}}else p.stage=Math.max(0,i-1);
+ persist();renderLesson(id);window.scrollTo(0,0)}
+function gradeQuiz(form){const isReview=location.hash.endsWith('/review'),l=findLesson(opened);if(!l)return;const p=lessonRecord(l),qs=questionsFor(l,p,isReview);const given=qs.map((q,i)=>{const hit=form.querySelector(`input[name="q${i}"]:checked`);return hit?Number(hit.value):null});if(given.some(x=>x===null)){notice('Please answer all questions before submitting.');return}let correct=0;
+ qs.forEach((q,i)=>{const good=given[i]===q.answer;if(good)correct++;const el=form.querySelector(`[data-feedback="${i}"]`);el.hidden=false;el.className=`quiz-feedback ${good?'correct':'wrong'}`;el.innerHTML=`<strong>${good?'✓ Correct':'✕ Not quite'}</strong><p>${esc(q.explanation)} ${!good?`<em>Correct answer: ${esc(q.options[q.answer])}.</em>`:''}</p>`});
+ const percent=Math.round(correct*100/qs.length),passed=correct/qs.length>=.8;const previousUnderstood=p.understood;
+ p.attempts.push({at:nowISO(),correct,total:qs.length,percent,mode:isReview?'review':'initial'});p.attempts=p.attempts.slice(-80);p.bestScore=Math.max(p.bestScore,percent);
+ if(!isReview){p.completed=true;p.finished ||= nowISO();p.stage=l.stages.length;p.visited=[...Array(l.stages.length).keys()];if(passed){p.understood=true;if(!previousUnderstood){p.firstPassed=dateKey();p.nextReview=plusDays(1);p.reviewStep=0;}}}
+ else {if(passed){p.reviewPasses++;p.reviewStep=Math.min(4,p.reviewStep+1);p.nextReview=plusDays(INTERVALS[p.reviewStep]);if(p.reviewPasses>=2&&p.firstPassed&&dayGap(p.firstPassed,dateKey())>=7)p.retained=true;}
+ else{p.reviewStep=0;p.nextReview=plusDays(1);}}
+ activity(isReview?'review':'lesson');persist();
+ const result=document.getElementById('quiz-result');result.innerHTML=`<div class="quiz-summary"><div class="result-percent">${percent}%</div><h3>${passed?'Understanding demonstrated':'Good effort — review and retry'}</h3><p>${correct} of ${qs.length} correct. ${passed?(isReview?`Next review: ${esc(p.nextReview)}.`:`${p.nextReview?`First spaced review: ${esc(p.nextReview)}.`:'Return later to practise.'}`):isReview?'Retry review after revisiting the lesson.':'You completed the lesson; understanding requires at least 80%.'}</p><div class="actions"><button class="primary" data-action="retry-quiz">Try quiz again</button><button class="secondary" data-action="leave-lesson">← Back to library</button></div></div>`;
+ form.querySelectorAll('input,button').forEach(x=>x.disabled=true);result.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function aiPrompt(){return `You are an expert educational writer creating content for my free offline mobile app Knowledge Stash v0.2. Generate exactly ONE substantial, accurate 8–10 minute ADVANCED lesson about: [INSERT TOPIC].\n\nOUTPUT FORMAT: Return ONLY one syntactically valid JSON object (no Markdown fences, comments, trailing commas, or surrounding prose). It MUST use this exact envelope: {"format":"knowledge-stash-lesson-pack","schemaVersion":2,"lessons":[{...one lesson...}]}. Use UTF-8 text. No HTML, Markdown markup, LaTeX syntax, image files, or JavaScript inside string fields. Do not add extra keys.\n\nLESSON OBJECT: {"id":"unique-lowercase-topic-slug","version":1,"title":"...","category":"Engineering","model":"system","level":"Intermediate","minutes":10,"hook":"...","stages":[...],"quiz":[...],"sources":[...]}. The id must be 3–64 lowercase letters/numbers/hyphens, unique and stable across revisions. Increase version only when revising existing lesson content; do not reuse an id for unrelated topics.\n\nAllowed categories EXACTLY: Psychology, Science, Engineering, Space, Philosophy, Business, Faith & ideas, History. Allowed models EXACTLY: concept, system, investigation, skill, historical. Choose model by learning objective, not a fixed format for each category.\n\nSTAGES: Make exactly FIVE different teaching stages. Each stage: {"title":"...","paragraphs":["...","...","..."],"visual":{"type":"comparison","left":"...","right":"..."},"takeaway":"..."}. Include 3–5 substantive paragraphs per stage (about 110–160 words total per stage, enough for real depth and accuracy; ~700–900 words total), engaging practical examples, appropriate calculations and explicit limitations. Avoid generic filler, unsupported claims and repetitive explanations. The visual is optional; include only if useful. Supported visual types (all predefined and safe): market, memory, relativity, longitude, reynolds, flow, sequence, timing, faultcases, comparison, argument, perspectives, timeline. Choose a matching type; never make up a new type. For type sequence, also provide "labels":["Step 1","Step 2","Step 3"] (3–7). For type comparison, provide left/right strings. Other visual types are built-in simulations with fixed parameters; they are useful only when the subject fits. Omit visual if none fits rather than forcing an irrelevant one.\n\nQUIZ: At least SIX meaningful questions testing application, comparison or transfer, NOT just word recognition. Each object: {"question":"...","options":["...","...","..."],"answer":0,"explanation":"..."}. answer is ZERO-BASED index, e.g. 0 = first option; choose 2–5 options each. Exactly one objectively defensible correct answer per question. Avoid pretending a contested philosophical/theological stance has one objectively correct conclusion; test understanding of arguments instead. Verify every correct index against the options.\n\nSOURCES: Provide 2–4 real reliable relevant sources as {"label":"Author or organisation — title","url":"https://..."}. Never fabricate URLs, studies, numbers or quotations. If you cannot verify a specific source, use a known authoritative stable general reference and qualify claims. Distinguish facts, simplified models, evidence and competing interpretations.\n\nBefore producing output, internally validate syntax, id, structure, factual assertions, maths, all answers, URLs and expected teaching depth. The app will reject invalid JSON; do not explain the schema in your output.\n\nAFTER I REVIEW CONTENT, I WILL: paste JSON into Add → Advanced lesson import or upload as a JSON file. Imported content lives on my phone until exported as a backup, while adding it to packs/community.json on GitHub publishes it for all devices.`;}
+function downloadText(name,text,mime='text/plain'){const blob=new Blob([text],{type:mime});const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500)}
+function addDialog(){openModal(`${modalTitle('Grow your library')}<h2>Add learning content</h2><p class="subtext">Two options: a complete deep lesson generated with the saved AI prompt, or a short quick idea.</p><div class="help-card"><strong>① Generate a deep lesson</strong><p>Copy the exact prompt, replace [INSERT TOPIC], and paste it into ChatGPT. Ask for ONE complete JSON pack at a time. You can keep the prompt as a downloadable text file for future use.</p><div class="actions"><button data-action="copy-prompt" class="primary">Copy AI lesson prompt</button><button data-action="download-prompt" class="secondary">↓ Save prompt .txt</button></div></div>
+ <label class="form-field">② Paste advanced lesson JSON<textarea id="pack-input" rows="7" placeholder='{"format":"knowledge-stash-lesson-pack","schemaVersion":2,"lessons":[...]}'></textarea></label><div class="actions"><button class="secondary" data-action="choose-pack">↑ Select JSON file</button><button class="primary" data-action="preview-pack">Validate & preview →</button></div><input id="pack-file" hidden type="file" accept=".json,application/json"><div id="pack-preview" class="import-preview" aria-live="polite"></div>
+ <details class="small-details"><summary>Add a quick idea instead (1–2 minutes)</summary><form id="quick-form"><label class="form-field">Title<input name="title" required maxlength="110"></label><label class="form-field">Category<select name="category">${CATS.slice(1).map(c=>`<option>${esc(c)}</option>`).join('')}</select></label><label class="form-field">Hook<input name="hook" required maxlength="250"></label><label class="form-field">Explanation<textarea name="body" required rows="4"></textarea></label><label class="form-field">Example<textarea name="example" rows="2"></textarea></label><label class="form-field">Takeaway<input name="takeaway" required></label><label class="form-field">Reflection question<input name="question"></label><button class="primary" type="submit">Save quick idea</button></form></details><p class="form-hint">Imported lessons are stored locally. Export Settings → Backup regularly. See ADDING-LESSONS.md in the ZIP for publishing lessons to every device.</p>`,'Add lessons and ideas')}
+function quickIdea(source,keepId=false){const x=obj(source);const title=str(x.title,110),hook=str(x.hook,250),body=str(x.body,1600),takeaway=str(x.takeaway,300);if(!title||!hook||!body||!takeaway)throw Error('Quick idea needs title, hook, body and takeaway');return {id:keepId&&typeof x.id==='string'&&x.id.startsWith('own-')?x.id:`own-${Date.now()}-${Math.floor(Math.random()*1e9)}`,title,hook,body,takeaway,category:CATS.includes(x.category)&&x.category!=='All'?x.category:'Science',example:str(x.example,900),question:str(x.question,300)}}
+function addQuick(form){try{const x=quickIdea(Object.fromEntries(new FormData(form).entries()));state.custom.push(x);state.saved=uniq([...state.saved,x.id]);if(!persist()){state.custom.pop();state.saved=state.saved.filter(y=>y!==x.id);return}closeModal();goto('#stash');notice('Quick idea added and saved')}catch(e){notice(String(e.message))}}
+async function copyPrompt(){try{await navigator.clipboard.writeText(aiPrompt());notice('Full lesson prompt copied.')}catch{const t=document.createElement('textarea');t.value=aiPrompt();dialog.appendChild(t);t.select();notice('Select and copy the prompt from the box.')}}
+function parseImport(text){let json;try{json=JSON.parse(text)}catch{throw Error('Invalid JSON: ensure AI output has no ``` fences, comments or trailing commas')}const lessons=validatePack(json);if(!lessons.length)throw Error('Pack has no lessons');const builtinIds=new Set(builtin.map(l=>l.id));for(const l of lessons)if(builtinIds.has(l.id))throw Error(`${l.id}: bundled lesson ID cannot be overwritten by local import`);
+ for(const l of lessons){const versions=[...packLessons,...state.customLessons].filter(x=>x.id===l.id).map(x=>x.version);const highest=Math.max(0,...versions);if(l.version<=highest)throw Error(`${l.id}: version must be higher than existing ${highest} to update it`)}return lessons}
+let previewed=[];
+function previewImport(){try{const raw=document.getElementById('pack-input').value;const list=parseImport(raw);previewed=list;document.getElementById('pack-preview').innerHTML=`<div class="help-card success"><strong>✓ Valid pack — ${list.length} ${list.length===1?'lesson':'lessons'}</strong>${list.map(l=>`<p><strong>${esc(l.title)}</strong><br>${esc(l.category)} · ${l.stages.length} stages · ${l.quiz.length} quiz questions · v${l.version} · ID: ${esc(l.id)}</p>`).join('')}<p>Adding a newer version resets assessment progress for that one lesson. Other progress is preserved.</p><button class="primary" data-action="confirm-import">Import ${list.length} lesson(s) →</button></div>`;notice('Validated successfully')}catch(e){previewed=[];document.getElementById('pack-preview').innerHTML=`<div class="error-note">${esc(e.message)}</div>`;notice('Import validation failed')}}
+function confirmImport(){if(!previewed.length)return;let latest;try{latest=parseImport(document.getElementById('pack-input').value)}catch(e){notice(`Revalidate JSON: ${e.message}`);return}if(JSON.stringify(latest)!==JSON.stringify(previewed)){notice('Content changed after preview. Please validate it again.');return}const replacing=previewed.filter(l=>[...state.customLessons,...packLessons].some(x=>x.id===l.id));if(replacing.length&&!confirm(`Replace ${replacing.length} local lesson(s) with newer versions? Their quiz progress will reset; other progress stays.`))return;
+ const old=state.customLessons.slice(),oldP={...state.lessonProgress};for(const l of previewed){state.customLessons=state.customLessons.filter(x=>x.id!==l.id);state.customLessons.push(l);if(replacing.some(x=>x.id===l.id))delete state.lessonProgress[l.id];}
+ if(!persist()){state.customLessons=old;state.lessonProgress=oldP;return}const n=previewed.length;previewed=[];closeModal();goto('#discover');libraryTab='Lessons';render();notice(`Imported ${n} advanced lesson${n!==1?'s':''}. Export a backup!`)}
+function settings(){openModal(`${modalTitle('Settings, privacy and recovery')}<h2>Settings & backup</h2><p class="subtext">Your learning data is stored locally in this browser. GitHub Pages cannot sync your progress automatically.</p><div class="toggle-row"><label for="dark-toggle">Dark mode</label><input id="dark-toggle" type="checkbox" ${state.theme==='dark'?'checked':''}></div><div class="section-head"><h2>Protect your learning</h2></div><p class="subtext">${state.customLessons.length} imported deep lessons · ${state.custom.length} quick ideas · ${Object.keys(state.lessonProgress).length} started advanced lessons.</p><div class="actions"><button class="primary" data-action="export">↓ Export full backup</button><button class="secondary" data-action="choose-backup">↑ Restore backup</button></div><input id="backup-file" type="file" hidden accept=".json,application/json"><p class="form-hint">Full backup includes imported lessons, custom ideas, saved bookmarks, quiz attempts and v0.1 history. Restoring replaces local v0.2 data only after confirmation.</p><div class="help-card"><strong>Saved instructions for future AI content</strong><p>Use the same fixed JSON format whenever you ask AI to produce new lessons. This avoids incompatible lessons and import errors.</p><button class="secondary" data-action="download-prompt">↓ Download official AI prompt</button><button class="secondary" data-action="export-pack">↓ Export publishable lesson pack</button></div><div class="help-card"><strong>Offline use</strong><p>Eight built-in lessons and published GitHub pack are cached after the app loads online. Imported lessons are already on this phone. External reference links need internet.</p><span id="offline-status" class="badge">${navigator.onLine?'Online':'Offline'}</span></div><button class="secondary destructive" data-action="reset">Delete v0.2 local learning data</button><p class="form-hint">Legacy v0.1 storage is never automatically deleted. v0.2.0 · No accounts, subscriptions, ads or external AI API.</p>`,'Settings')}
+function exportContentPack(){const lessons=[...packLessons,...state.customLessons];const picked=new Map();for(const l of lessons){const old=picked.get(l.id);if(!old||l.version>=old.version)picked.set(l.id,l)}downloadText('community.json',JSON.stringify({format:'knowledge-stash-lesson-pack',schemaVersion:2,lessons:[...picked.values()]},null,2),'application/json');notice('Public content pack exported — upload to packs/community.json on GitHub.')}
+function exportBackup(){downloadText(`knowledge-stash-v0.2-backup-${dateKey()}.json`,JSON.stringify({format:'knowledge-stash-backup',version:2,exported:nowISO(),state},null,2),'application/json');notice('Backup downloaded. Save it somewhere safe.')}
+async function restoreBackup(file){try{if(file.size>8_000_000)throw Error('Backup is too large (max 8 MB)');const raw=JSON.parse(await file.text());if(raw.format!=='knowledge-stash-backup'||![1,2].includes(raw.version))throw Error('Unsupported backup file');let incoming;
+ if(raw.version===1)incoming=validateOld(raw.state);else{const x=obj(raw.state);if(x.schemaVersion!==2)throw Error('Missing v0.2 schemaVersion');incoming={...emptyState(),...x};incoming.customLessons=(Array.isArray(x.customLessons)?x.customLessons:[]).map(validLesson);if(new Set(incoming.customLessons.map(l=>l.id)).size!==incoming.customLessons.length)throw Error('Duplicate restored lesson ID');if(incoming.customLessons.some(l=>builtin.some(b=>b.id===l.id)))throw Error('Backup tries to replace a built-in lesson');incoming.custom=(Array.isArray(x.custom)?x.custom:[]).slice(0,500).map(c=>quickIdea(c,true));incoming.saved=Array.isArray(x.saved)?uniq(x.saved.filter(y=>typeof y==='string')):[];incoming.lessonProgress=obj(x.lessonProgress);incoming.history=Array.isArray(x.history)?x.history.slice(-1200):[];incoming.learned=obj(x.learned);incoming.reviews=obj(x.reviews);incoming.theme=x.theme==='dark'?'dark':'light';}
+ if(!confirm(`Restore this v${raw.version} backup? This will replace existing v0.2 data on this device. Export your current backup first if needed.`))return;
+ const prev=state;state=incoming;if(!persist()){state=prev;return}closeModal();goto('#today');notice(`Version ${raw.version} backup restored.`)}catch(e){console.error(e);notice(`Restore failed: ${String(e.message).slice(0,100)}`)}}
+function reset(){if(!confirm('Delete v0.2 bookmarks, custom lessons and progress? This cannot be undone without a backup. Original v0.1 data is left intact.'))return;state=emptyState();persist();closeModal();goto('#today');notice('v0.2 local data cleared. Original v0.1 records remain separately.')}
+function leaveLesson(){opened=null;goto('#discover')}
+function reread(){const l=findLesson(opened);if(!l)return;const p=lessonRecord(l);p.stage=0;persist();renderLesson(l.id);window.scrollTo(0,0)}
+function retryQuiz(){const l=findLesson(opened);if(!l)return;renderLesson(l.id);window.scrollTo(0,0)}
+// All delegated handlers; every user-generated string is escaped before insertion in HTML.
+document.getElementById('open-add').addEventListener('click',addDialog);document.getElementById('open-settings').addEventListener('click',settings);
+window.addEventListener('hashchange',()=>{closeModal();const h=location.hash;if(!h.startsWith('#lesson/'))opened=null;render();window.scrollTo(0,0)});
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden)closeModal()});
+document.addEventListener('input',e=>{if(e.target.id==='search'){searchTerm=e.target.value;filterResults()}});
+document.addEventListener('change',async e=>{if(e.target.id==='dark-toggle'){state.theme=e.target.checked?'dark':'light';persist();document.documentElement.classList.toggle('dark',state.theme==='dark')}
+ if(e.target.id==='pack-file'&&e.target.files?.[0]){const f=e.target.files[0];if(f.size>650000){notice('Pack too large (max 650 KB). Import smaller packs.');return}document.getElementById('pack-input').value=await f.text();previewImport()}
+ if(e.target.id==='backup-file'&&e.target.files?.[0])restoreBackup(e.target.files[0]);});
+document.addEventListener('submit',e=>{if(e.target.id==='quick-form'){e.preventDefault();addQuick(e.target)}if(e.target.id==='quiz-form'){e.preventDefault();gradeQuiz(e.target)}});
+document.addEventListener('click',e=>{
+ const lesson=e.target.closest('[data-lesson]');if(lesson){opened=lesson.dataset.lesson;goto(`#lesson/${opened}`);return}
+ const rev=e.target.closest('[data-review-lesson]');if(rev){opened=rev.dataset.reviewLesson;goto(`#lesson/${opened}/review`);return}
+ const idea=e.target.closest('[data-idea]');if(idea){ideaDialog(idea.dataset.idea);return}
+ const s=e.target.closest('[data-save]');if(s){toggleSave(s.dataset.save);return}
+ const learn=e.target.closest('[data-learn]');if(learn){learnOld(learn.dataset.learn);return}
+ const old=e.target.closest('[data-old-review]');if(old){oldReview(old.dataset.oldReview,old.dataset.result);return}
+ const stage=e.target.closest('[data-stage]');if(stage){moveStage(stage.dataset.stage);return}
+ const cat=e.target.closest('[data-cat]');if(cat){selection=cat.dataset.cat;discover();return}
+ const lib=e.target.closest('[data-library]');if(lib){libraryTab=lib.dataset.library;discover();return}
+ const action=e.target.closest('[data-action]')?.dataset.action;if(!action)return;
+ if(action==='close')closeModal();if(action==='add')addDialog();if(action==='copy-prompt')copyPrompt();if(action==='download-prompt')downloadText('Knowledge-Stash-AI-LESSON-PROMPT.txt',aiPrompt());if(action==='choose-pack')document.getElementById('pack-file')?.click();if(action==='preview-pack')previewImport();if(action==='confirm-import')confirmImport();if(action==='export')exportBackup();if(action==='export-pack')exportContentPack();if(action==='choose-backup')document.getElementById('backup-file')?.click();if(action==='reset')reset();if(action==='leave-lesson')leaveLesson();if(action==='retry-quiz')retryQuiz();if(action==='reread')reread();if(action==='clear-answers'){document.getElementById('quiz-form')?.reset();}
+});
+async function loadPublishedPack(){try{const res=await fetch('./packs/community.json',{cache:'no-cache'});if(!res.ok)throw Error(`HTTP ${res.status}`);const data=validatePack(await res.json());if(data.some(l=>builtin.some(b=>b.id===l.id)))throw Error('Pack conflicts with built-in lesson ID');packLessons=data;render()}catch(e){console.warn('Published pack unavailable; using built-in and local lessons:',e)}}
+async function offlineSetup(){if(!('serviceWorker' in navigator)||!['https:','http:'].includes(location.protocol))return;try{const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});function offer(){if(registration.waiting&&!sessionStorage.getItem('ks-update-hidden')){const box=document.createElement('div');box.className='update-banner';box.innerHTML='<span>New offline app update ready.</span><button class="primary">Update now</button><button class="secondary" aria-label="Later">Later</button>';document.body.appendChild(box);box.querySelector('.primary').onclick=()=>registration.waiting.postMessage({type:'SKIP_WAITING'});box.querySelector('.secondary').onclick=()=>{sessionStorage.setItem('ks-update-hidden','1');box.remove()};}}
+ offer();registration.addEventListener('updatefound',()=>registration.installing?.addEventListener('statechange',offer));let reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloaded){reloaded=true;location.reload()}});
+ }catch(e){console.warn('Offline installation unavailable:',e)}}
+if(!location.hash)history.replaceState(null,'','#today');render();loadPublishedPack();window.addEventListener('load',offlineSetup);
 })();

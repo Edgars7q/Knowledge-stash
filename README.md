@@ -1,54 +1,52 @@
-# Knowledge Stash v0.1
+# Knowledge Stash v0.2 — Advanced Learning Edition
 
-A **free, mobile-first, offline-friendly microlearning app** made with plain HTML, CSS and JavaScript. No subscription, server, build tool, login, API key, or tracking.
+**Free Android-first progressive web app. No paid service, API key, login, tracking or build tools required.** Contains **8 original multi-stage deep lessons** (each around 700–760 words of teaching text plus interactive graphics and 6 assessment questions) and **all 32 original v0.1 quick cards**.
 
-## What is inside?
+## Upgrade your current GitHub Pages app safely
 
-- **Today** — three rotating daily picks, learning progress, streak and completion count.
-- **Discover** — search and filter 32 starter knowledge cards across eight subjects.
-- **My Stash** — bookmark useful cards and add your own.
-- **Review** — revisit learned cards on 1-, 3-, 7-, 14- and 30-day intervals.
-- **Add idea** — manually author a card or paste JSON from ChatGPT.
-- **Settings** — dark mode, export/restore a JSON backup, delete local data.
-- **Offline** — after first successful load, the basic app and starter cards work offline when served over HTTPS.
+1. In your running **v0.1 app**, open **Settings → Export backup**. Save the backup somewhere safe **before** updating GitHub. Do not clear your phone's Chrome storage.
+2. In GitHub, keep your current `knowledge-stash` repository and URL. (Optional safety: tag or download the existing files.)
+3. Download this new ZIP, extract it, and replace **all old files** at your repository root with the **contents** of `Knowledge-Stash-v0.2/`. Do not upload the ZIP as a single file. Upload `index.html`, `app.js`, `data.js`, `style.css`, `visuals.js`, `sw.js`, `manifest.webmanifest`, `.nojekyll`, `icons/`, `lessons/` and `packs/`. GitHub web uploader may not upload folder objects; open an existing folder in GitHub to upload its files, or use the GitHub file editor to create any missing folder by naming a file `folder/file.ext`.
+4. Your GitHub Pages configuration remains **Settings → Pages → main → /(root)**. Keep the **same hostname and repository path**, otherwise local progress cannot follow automatically.
+5. On Android, open the app using Chrome. With internet connected, refresh once, then reopen. Your old local data is migrated from `knowledge-stash-v1` to `knowledge-stash-v2` on first use (the old key is preserved). If an older app appears due to service-worker cache, close and reopen Chrome and reload while online; do not clear storage.
+6. Check My Stash and Review, then in **Settings → Export full backup** save a fresh v0.2 backup. After loading online, switch off internet and confirm lessons and quizzes work.
 
-## Easiest way to install on Android, for €0
+**Note:** Imported lessons and progress live on the **specific phone and site origin**. GitHub only publishes bundled lessons and `packs/community.json`. It does **not** sync personal progress. Back up regularly and before changing devices.
 
-1. Make a free GitHub account if you do not have one.
-2. Create a new **public** repository called `knowledge-stash` (GitHub Pages requires a public repository on the GitHub Free plan).
-3. Upload the **contents of this folder** to the *top level* of the repository. You should see `index.html`, `app.js`, `data.js`, `style.css`, `sw.js`, `manifest.webmanifest`, `icons/`, and `.nojekyll`. If using a ZIP, unzip it first and upload its contents.
-4. In the repository, open **Settings → Pages**. Under **Build and deployment**, choose **Deploy from a branch**, branch **main**, folder **/(root)**; then save.
-5. Open the URL shown by GitHub Pages. It normally resembles `https://YOUR-USERNAME.github.io/knowledge-stash/`.
-6. On your Android phone, open that HTTPS URL in **Chrome**. Tap **⋮ → Add to Home screen** or **Install app** (wording depends on Chrome and Android), then confirm.
-7. Launch **Knowledge Stash** from the home screen like another app.
+## Add new content (simple workflow)
 
-The starter content is public because the GitHub repository is public. **Your saved ideas, custom ideas, learning history and progress are not committed to GitHub**: they remain only in your device/browser storage unless *you* export and share a backup.
+**For a personal lesson on your phone:** Tap **＋ → Copy AI lesson prompt**, replace `[INSERT TOPIC]`, send to ChatGPT, copy the JSON, then paste in **＋ → Advanced lesson JSON → Validate & preview → Import**. You can also upload a downloaded `.json` file. The importer checks all required fields, the 6-question assessments, stable IDs, model names and HTTPS references. Rejected content does not change your library.
 
-## Change the ideas
+**For permanent lessons hosted on GitHub (available to all visitors and devices):** Import your approved lessons in the app, then select **Settings → Export publishable lesson pack**. Downloaded `community.json` contains **content only** (no bookmarks or learning progress). In GitHub, open `packs/community.json`, edit it or upload your exported file to replace it, then commit. Reload online: the pack will appear in Discover. If you want to update a published lesson, generate the same `id` with a **higher `version`**. Note: on-phone imports also need newer versions for an existing ID.
 
-You can add one card via the **＋** icon, or select **Copy ChatGPT prompt**, ask ChatGPT for learning cards, copy the JSON response, and paste it into the **Import generated cards** box. This does not use the OpenAI API or connect your ChatGPT account; it is a copy/paste workflow.
+**Quick cards:** Tap **＋ → Add a quick idea** and fill in the fields. The original v0.1 `data.js` quick library remains readable.
 
-You can also edit `data.js` to adjust the starter library, then re-upload it to GitHub.
+Keep `KNOWLEDGE-STASH-AI-PROMPT.txt` as your **canonical saved AI instructions**. `ADDING-LESSONS.md` explains fields, updates and backups; `docs/EXAMPLE-LESSON-PACK.json` is a ready-to-import demonstration.
 
-## Data, limitations and privacy
+## Progress meanings
 
-- This is a static prototype, not a native Android app or a published Google Play Store app.
-- Saved data uses `localStorage`: it stays across normal browser sessions, but may be lost if site storage or browser data is cleared, the site URL changes, or the phone is reset. **Export a backup regularly**.
-- It does not sync between devices; import a backup on the next phone if needed.
-- The three daily suggestions rotate through the starter library. They are **not freshly generated by AI each day**. Add more via ChatGPT as above. The original 32 cards repeat once the selection cycles.
-- Offline use works after the app has successfully loaded and cached its files on the hosted HTTPS site. If installed while disconnected or the cache is cleared, it may not be available offline.
-- Hosting through GitHub Pages makes the *source code* and included starter cards public on the free plan, but does not expose your local saved data to other visitors.
-- Opening `index.html` directly via a `file://` URL is **not** a reliable way to test saving data or the install/offline behavior. Host it on GitHub Pages.
-- Fact-check newly AI-generated learning cards, especially medical, legal, safety-critical and other consequential content.
+- **In progress:** Lesson opened; stage location saved.
+- **Completed:** All stages passed through and the final quiz submitted, regardless of score.
+- **Understood:** Quiz score **at least 80%**.
+- **Reviewed:** A **due** spaced quiz passed; next due after 1, 3, 7, 14 or 30-day sequence (depending on step).
+- **Retention demonstrated:** At least two successful spaced reviews and at least seven calendar days since first passing assessment. Not a claim of permanent mastery.
 
-## Included project files
+Review answers require multiple-choice selections and explanatory feedback. A failed review returns to tomorrow's interval. On lesson content version changes, assessment progress for that lesson resets to avoid certifying understanding of materially changed content.
 
-`index.html` / `style.css` / `app.js` / `data.js` / `sw.js` / `manifest.webmanifest` / `icons/icon-192.png` / `icons/icon-512.png` / `.nojekyll`.
+## Offline, compatibility, privacy
 
-## Optional local test
+This static site requires **HTTPS** (GitHub Pages) for proper installed-PWA and service-worker behaviour. Cache includes all eight built-in lessons, visuals and community JSON. Your imported lessons, bookmarks and scores are locally saved. Offline external links to academic sources will not work. No cross-device sync and no AI API integration are included. Browser storage is not guaranteed to survive uninstall, data clearance or a device reset; export backups.
 
-From this directory run `python -m http.server 8080`, then visit `http://localhost:8080` on the same computer. For Android testing, publish the HTTPS site with GitHub Pages as above.
+The first update from v0.1 uses an existing older service worker and its own cache; while online, allow the new worker to install and reload. This upgrade intentionally leaves the old v0.1 localStorage key untouched for rollback.
 
-## Next features (not in v0.1)
+## Important constraints
 
-Category preferences, adaptive recommendations, full review quizzes, optional device-to-device sync, richer references for cards, and a more advanced built-in editor. None of these are needed to start using the free version.
+- Lesson packs use **JSON only**, not generated HTML or JavaScript. Teaching visuals are selected from a safe built-in component list. New visual types require code changes, not prompt changes.
+- Sources are citation links for user review; the app does not fetch scholarly material for offline storage.
+- Public GitHub Pages publishes source code and the community lesson pack **publicly**.
+- User-added lesson JSON resides in `localStorage`, which may hit browser capacity after many long imports; import smaller batches and export backups. A future IndexedDB migration can extend capacity.
+- `docs/` files are for reference; they are not required for app startup.
+
+## Test locally
+
+Run `python3 -m http.server 8080` from this directory and open `http://localhost:8080`. Chrome supports service workers on localhost. Use the checklist in `TESTING-CHECKLIST.md`; automated smoke tests are in `tests/smoke_test.py` (Playwright browser installation required).

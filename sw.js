@@ -1,28 +1,14 @@
-const CACHE = 'knowledge-stash-v2';
-const ASSETS = [
-  './', './index.html', './style.css', './data.js', './app.js',
-  './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'
-];
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
-});
-self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
-});
-// Prefer fresh files online so updates reach installed phones; use cached files offline.
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== location.origin) return;
-  event.respondWith((async () => {
-    try {
-      const response = await fetch(event.request);
-      if (response.ok) {
-        const cache = await caches.open(CACHE);
-        await cache.put(event.request, response.clone());
-      }
-      return response;
-    } catch {
-      return await caches.match(event.request) ||
-        (event.request.mode === 'navigate' ? await caches.match('./index.html') : Response.error());
-    }
-  })());
-});
+/* App shell precache: replace atomically, retain previous functioning cache if install fails. */
+const CACHE='ks-app-v0.2.0';
+const PREFIX='ks-app-';
+const ASSETS=['./','./index.html','./style.css?v=0.2.0','./data.js?v=0.2.0','./visuals.js?v=0.2.0','./lessons/builtin.js?v=0.2.0','./app.js?v=0.2.0','./packs/community.json','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));});
+self.addEventListener('message',e=>{if(e.data?.type==='SKIP_WAITING')self.skipWaiting()});
+self.addEventListener('activate',e=>e.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith(PREFIX)&&k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim()})()));
+self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==self.location.origin)return;
+ e.respondWith((async()=>{const cache=await caches.open(CACHE);if(e.request.mode==='navigate'){try{const response=await fetch(e.request);if(response.ok)await cache.put(e.request,response.clone());return response}catch{return await cache.match('./index.html')||Response.error()}}
+ // Update the published community pack online; use cached version offline.
+ if(u.pathname.endsWith('/packs/community.json')){try{const r=await fetch(e.request);if(r.ok){await cache.put(e.request,r.clone());return r}}catch{}return await cache.match(e.request)||Response.error()}
+ const existing=await cache.match(e.request);if(existing)return existing;
+ try{const r=await fetch(e.request);if(r.ok)await cache.put(e.request,r.clone());return r}catch{return Response.error()}
+ })());});
