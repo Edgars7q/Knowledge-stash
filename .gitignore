@@ -1,0 +1,5 @@
+# Disposable single-file preview generated from the maintained app sources.
+/preview.html
+/previews/
+__pycache__/
+*.py[cod]
