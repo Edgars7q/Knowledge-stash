@@ -1,5 +1,15 @@
 # Adding lessons later — repeatable process
 
+## Linked quick cards and public browsing
+
+Visitors can read quick cards without signing in. Every card in the public collection links to a full lesson through `lessonId`; **Explore more** requests demo sign-in and then opens that lesson. This is a prototype UI flow, not server-enforced access control.
+
+For repository-authored content, publish the full lesson first, then add its quick introduction to `window.STARTER_IDEAS` in `data.js`. Use the existing fields (`id`, `category`, `title`, `hook`, `body`, `example`, `takeaway`, `question`) and a `lessonId` matching the full lesson's stable ID. The quick card's category must match the lesson. Unavailable or mismatched targets are excluded from public quick-card browsing; never add a dead-end preview.
+
+The lesson-pack envelope and canonical AI lesson prompt remain unchanged. The eight current bundled topics each have a matching quick card. The old independent starter cards are kept only for historical saved items and reviews, not the public quick-card list. Do not delete users' historical state when retiring public content.
+
+Personal quick-card creation also requires a full-lesson selection. Older unlinked personal cards remain available in My Stash and backups. Sign in to the intended profile before importing a full lesson; a lesson stored only in Guest is not copied into a different demo profile by signing in.
+
 ## The no-code route (recommended)
 
 1. Keep `KNOWLEDGE-STASH-AI-PROMPT.txt` saved somewhere accessible (Google Drive, Notes, or on your phone). The identical prompt is built into the app under **＋ → Copy AI lesson prompt** and **Settings → Download official AI prompt**.
@@ -60,6 +70,6 @@ Each quiz question uses `answer` **zero-based**: first option `0`, second `1`, t
 
 ## How to ask AI to improve an existing lesson
 
-> Use the Knowledge Stash official prompt. Update lesson `robot-sensors` from version 1 to version 2. Keep the topic and teaching goal, but correct [specific problem], deepen stage 3, and improve the quiz. Return the complete v0.2 lesson-pack JSON only. Preserve the stable `id`, raise `version` to 2, and do not invent any unsupported visual type.
+> Use the Knowledge Stash official prompt. Update lesson `robot-sensors` from version 1 to version 2. Keep the topic and teaching goal, but correct [specific problem], deepen stage 3, and improve the quiz. Return the complete schema-version-2 lesson-pack JSON only. Preserve the stable `id`, raise `version` to 2, and do not invent any unsupported visual type.
 
 When generating a new lesson, change the topic, category, teaching model and sources to suit the subject. Do **not** demand the same visual or reasoning style for every category.

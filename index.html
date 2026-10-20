@@ -2,16 +2,17 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f7f7fb"><meta name="description" content="Knowledge Stash — a free, offline, interactive learning library.">
-<title>Knowledge Stash 0.2 — Learn deeply</title>
-<link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icons/icon-192.png"><link rel="icon" href="./icons/icon-192.png"><link rel="stylesheet" href="./style.css?v=0.2.0">
+<title>Knowledge Stash 0.3 — Learn deeply</title>
+<link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icons/icon-192.png"><link rel="icon" href="./icons/icon-192.png"><link rel="stylesheet" href="./style.css?v=0.3.0">
 </head><body>
 <div class="app-shell">
-<header class="topbar"><a class="brand" href="#today" aria-label="Knowledge Stash home"><span class="brand-icon">✦</span>Knowledge <strong>Stash</strong></a><div class="header-actions"><button id="open-add" class="icon-button" aria-label="Add new learning content" title="Add cards or lessons">＋</button><button id="open-settings" class="icon-button" aria-label="Settings and backup" title="Settings">⚙</button></div></header>
+<header class="topbar"><a class="brand" href="#welcome" aria-label="Knowledge Stash home"><span class="brand-icon">✦</span>Knowledge <strong>Stash</strong></a><div class="header-actions"><button id="welcome-sign-in" class="secondary compact" hidden>Sign in</button><button id="open-add" class="icon-button" aria-label="Add new learning content" title="Add cards or lessons">＋</button><button id="open-settings" class="icon-button" aria-label="Settings and backup" title="Settings">⚙</button></div></header>
+<div class="account-strip"><button id="open-account" class="account-button" aria-label="Account: Guest. Demo sign-in"><span class="account-avatar" aria-hidden="true">◉</span><strong id="account-label">Guest</strong><span id="account-hint">Demo sign-in</span><span aria-hidden="true">›</span></button></div>
 <main id="app-content" tabindex="-1"></main>
 <nav class="bottom-nav" id="bottom-nav" aria-label="Main navigation"><a href="#today" data-tab="today" class="nav-item"><span class="nav-symbol">⌂</span><span>Today</span></a><a href="#discover" data-tab="discover" class="nav-item"><span class="nav-symbol">◈</span><span>Discover</span></a><a href="#stash" data-tab="stash" class="nav-item"><span class="nav-symbol">▣</span><span>My Stash</span></a><a href="#review" data-tab="review" class="nav-item"><span class="nav-symbol">↻</span><span>Review</span></a></nav>
 </div>
 <div id="overlay" class="overlay" hidden><section id="dialog" class="dialog" role="dialog" aria-modal="true" aria-label="Knowledge Stash dialog"></section></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="./visuals.js?v=0.2.0"></script>
-<script src="./data.js?v=0.2.0"></script><script src="./lessons/builtin.js?v=0.2.0"></script><script src="./app.js?v=0.2.0" defer></script>
+<script src="./auth.js?v=0.3.0"></script><script src="./visuals.js?v=0.3.0"></script>
+<script src="./data.js?v=0.3.0"></script><script src="./lessons/builtin.js?v=0.3.0"></script><script src="./app.js?v=0.3.0" defer></script>
 </body></html>

@@ -1,7 +1,7 @@
 """Test migration and import rejection using DOM harness, without network navigation."""
 from playwright.sync_api import sync_playwright
 import pathlib,re,json
-root=pathlib.Path('/mnt/data/Knowledge-Stash-v0.2')
+root=pathlib.Path(__file__).resolve().parents[1]
 html=re.sub(r'<script [^>]*></script>','',(root/'index.html').read_text())
 html=re.sub(r'<link [^>]*rel="(?:stylesheet|manifest|apple-touch-icon|icon)"[^>]*>','',html)
 legacy={'saved':['e1','own-123-456'],'learned':{'e1':'2026-10-01'},'reviews':{'e1':{'step':2,'due':'2026-11-01'}},'history':[{'day':'2026-10-01','type':'learn'}], 'custom':[{'id':'own-123-456','title':'My idea','category':'Science','hook':'Testing old content','body':'Legacy body for backward compatibility','takeaway':'Keep old data'}], 'theme':'dark'}
@@ -14,6 +14,7 @@ with sync_playwright() as pw:
  s=p.evaluate("JSON.parse(localStorage.getItem('knowledge-stash-v2'))")
  assert s['saved']==['e1','own-123-456'] and s['theme']=='dark' and s['custom'][0]['id']=='own-123-456'
  assert p.evaluate("localStorage.getItem('knowledge-stash-v1')")
+ p.locator('[data-page="welcome"]').wait_for();p.locator('[data-action="continue-guest"]').click()
  p.locator('[data-tab=stash]').click();assert 'My idea' in p.locator('main').inner_text()
  p.locator('#open-add').click()
  invalid={'format':'knowledge-stash-lesson-pack','schemaVersion':2,'lessons':[{'id':'bad','version':1,'title':'Bad','category':'Invalid'}]}

@@ -1,4 +1,4 @@
-You are an expert educational writer creating content for my free offline mobile app Knowledge Stash v0.2. Generate exactly ONE substantial, accurate 8–10 minute ADVANCED lesson about: [INSERT TOPIC].
+You are an expert educational writer creating content for my free offline mobile app Knowledge Stash v0.3. Generate exactly ONE substantial, accurate 8–10 minute ADVANCED lesson about: [INSERT TOPIC].
 
 OUTPUT FORMAT: Return ONLY one syntactically valid JSON object (no Markdown fences, comments, trailing commas, or surrounding prose). It MUST use this exact envelope: {"format":"knowledge-stash-lesson-pack","schemaVersion":2,"lessons":[{...one lesson...}]}. Use UTF-8 text. No HTML, Markdown markup, LaTeX syntax, image files, or JavaScript inside string fields. Do not add extra keys.
 

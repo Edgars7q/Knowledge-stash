@@ -1,7 +1,7 @@
 /* App shell precache: replace atomically, retain previous functioning cache if install fails. */
-const CACHE='ks-app-v0.2.0';
-const PREFIX='ks-app-';
-const ASSETS=['./','./index.html','./style.css?v=0.2.0','./data.js?v=0.2.0','./visuals.js?v=0.2.0','./lessons/builtin.js?v=0.2.0','./app.js?v=0.2.0','./packs/community.json','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const PREFIX=`ks-app-${encodeURIComponent(new URL(self.registration.scope).pathname)}-`;
+const CACHE=PREFIX+'v0.3.0';
+const ASSETS=['./','./index.html','./style.css?v=0.3.0','./auth.js?v=0.3.0','./demo/accounts.json','./data.js?v=0.3.0','./visuals.js?v=0.3.0','./lessons/builtin.js?v=0.3.0','./app.js?v=0.3.0','./packs/community.json','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));});
 self.addEventListener('message',e=>{if(e.data?.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith(PREFIX)&&k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim()})()));
